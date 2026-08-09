@@ -1,7 +1,8 @@
 {
-  "env": {
-
-    "VITE_SUPABASE_URL": "https://rckxemkrjnnugzlukawz.supabase.co",
-    "VITE_SUPABASE_ANON_KEY": "sb_publishable_0sziKyZQlXMTb53qUcociQ_4KHBriLt"
-  }
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
 }
