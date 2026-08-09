@@ -12,8 +12,8 @@ async function getAuthedContext(req) {
   if (error || !user) return { error: 'Unauthorized: invalid or expired token' };
 
   const scopedClient = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    process.env.VITE_SUPABASE_URL,
+    process.env.VITE_SUPABASE_ANON_KEY,
     { global: { headers: { Authorization: `Bearer ${token}` } } }
   );
 
