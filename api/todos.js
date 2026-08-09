@@ -33,9 +33,9 @@ async function getAuthedContext(req) {
     process.env.VITE_SUPABASE_URL,
     process.env.VITE_SUPABASE_ANON_KEY,
     {
-      global:{
-        headers:{
-          Authorization:`Bearer ${token}`
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`
         }
       }
     }
@@ -51,19 +51,20 @@ async function getAuthedContext(req) {
 
 
 
-function validateTitle(title){
+function validateTitle(title) {
 
-  if(!title || typeof title !== "string"){
+  if (!title || typeof title !== "string" || !title.trim()) {
     return "Title is required";
   }
 
-  if(title.trim().length < 3){
+
+  if (title.trim().length < 3) {
     return "Title must be at least 3 characters";
   }
 
 
-  if(title.trim().length > 150){
-    return "Title too long";
+  if (title.trim().length > 150) {
+    return "Title must be under 150 characters";
   }
 
 
@@ -73,9 +74,12 @@ function validateTitle(title){
 
 
 
-export default async function handler(req,res){
 
 
+export default async function handler(req, res) {
+
+
+  // CORS
   res.setHeader(
     "Access-Control-Allow-Origin",
     "*"
@@ -88,16 +92,24 @@ export default async function handler(req,res){
   );
 
 
-  if(req.method==="OPTIONS"){
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET, POST, OPTIONS"
+  );
+
+
+  if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
+
+
 
 
 
   const auth = await getAuthedContext(req);
 
 
-  if(auth.error){
+  if (auth.error) {
 
     return res.status(401).json({
       success:false,
@@ -107,28 +119,96 @@ export default async function handler(req,res){
   }
 
 
-  const {user,client}=auth;
+
+  const {
+    user,
+    client
+  } = auth;
 
 
 
-  try{
+
+  try {
 
 
-    if(req.method==="GET"){
+    // =========================
+    // GET TODOS
+    // =========================
+
+    if(req.method === "GET") {
 
 
-      const {data,error}=await client
-      .from("todos")
-      .select("*")
-      .eq("user_id",user.id)
-      .order("created_at",
-      {
-        ascending:false
-      });
+      const {
+        q,
+        status
+      } = req.query;
+
+
+
+      let query = client
+        .from("todos")
+        .select("*")
+        .eq(
+          "user_id",
+          user.id
+        );
+
+
+
+      // Filter status
+
+      if(status) {
+
+        if(
+          !["pending","completed"]
+          .includes(status)
+        ) {
+
+          return res.status(400).json({
+            success:false,
+            message:"Invalid status"
+          });
+
+        }
+
+
+        query = query.eq(
+          "status",
+          status
+        );
+
+      }
+
+
+
+
+      // Search
+
+      if(q && q.trim()) {
+
+        query = query.or(
+          `title.ilike.%${q}%,description.ilike.%${q}%`
+        );
+
+      }
+
+
+
+
+      const {
+        data,
+        error
+      } = await query.order(
+        "created_at",
+        {
+          ascending:false
+        }
+      );
 
 
 
       if(error) throw error;
+
 
 
       return res.status(200).json(data);
@@ -138,42 +218,62 @@ export default async function handler(req,res){
 
 
 
-    if(req.method==="POST"){
+
+
+
+    // =========================
+    // CREATE TODO
+    // =========================
+
+    if(req.method === "POST") {
 
 
       const {
         title,
         description
-      }=req.body;
+      } = req.body || {};
 
 
 
-      const errorMessage=validateTitle(title);
+      const validation =
+        validateTitle(title);
 
 
-      if(errorMessage){
+
+      if(validation) {
 
         return res.status(400).json({
           success:false,
-          message:errorMessage
+          message:validation
         });
 
       }
 
 
 
-      const {data,error}=await client
-      .from("todos")
-      .insert({
 
-        user_id:user.id,
-        title:title.trim(),
-        description:description || null,
-        status:"pending"
+      const {
+        data,
+        error
+      } = await client
+        .from("todos")
+        .insert({
 
-      })
-      .select()
-      .single();
+          user_id:user.id,
+
+          title:title.trim(),
+
+          description:
+            description
+            ? description.trim()
+            : null,
+
+          status:"pending"
+
+        })
+        .select()
+        .single();
+
 
 
 
@@ -181,30 +281,44 @@ export default async function handler(req,res){
 
 
 
-      return res.status(201).json(data);
 
+      return res.status(201).json(data);
 
     }
 
 
 
 
+
+
     return res.status(405).json({
+
       success:false,
+
       message:"Method not allowed"
+
     });
 
 
 
-  }catch(err){
 
 
-    console.error(err);
+  } catch(error) {
+
+
+    console.error(
+      "Todo API Error:",
+      error
+    );
+
 
 
     return res.status(500).json({
+
       success:false,
-      message:err.message
+
+      message:error.message
+
     });
 
 
